@@ -1,5 +1,9 @@
+import os
+
+
 def main():
-    print("Hello World!")
+    os.remove("easycut.txt")
+    print("easycut.txt removed!")
 
 
 if __name__ == "__main__":
