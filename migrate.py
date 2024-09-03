@@ -52,6 +52,19 @@ def remove_directory(directory_path, summary):
         log_operation(summary, f"Removal of {directory_path}", f"FAILED ({str(e)})")
 
 
+def remove_file(file_path, summary):
+    """Remove the specified file."""
+    try:
+        os.remove(file_path)
+        log_operation(summary, f"Removal of {file_path}", "SUCCESS")
+    except FileNotFoundError:
+        log_operation(summary, f"Removal of {file_path}", "FAILED (Not Found)")
+    except PermissionError:
+        log_operation(summary, f"Removal of {file_path}", "FAILED (Permission Denied)")
+    except Exception as e:
+        log_operation(summary, f"Removal of {file_path}", f"FAILED ({str(e)})")
+
+
 def log_operation(summary, operation, result, print_message=False):
     """Log the result of an operation."""
     message = f"{operation}: {result}"
