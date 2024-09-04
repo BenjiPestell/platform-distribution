@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 
 """
@@ -65,11 +66,29 @@ def remove_file(file_path, summary):
         log_operation(summary, f"Removal of {file_path}", f"FAILED ({str(e)})")
 
 
-def log_operation(summary, operation, result, print_message=False):
+def find_sw_version(summary, directory="."):
+    # Define the pattern to match files like v2.8.1.txt or v3.12.1.txt
+    pattern = re.compile(r'^v(\d+\.\d+\.\d+)\.txt$', re.IGNORECASE)
+
+    # Search for the file in the specified directory
+    for root, dirs, files in os.walk(directory):
+        for file in files:
+            match = pattern.match(file)
+            if match:
+                # Extract the version part from the filename
+                sw_version = match.group(1)
+                log_operation(summary, f"SW Version {sw_version} File", "FOUND")
+                return sw_version
+
+    log_operation(summary, "SW Version File", "NOT FOUND")
+    return None
+
+
+def log_operation(summary, operation, result, print_realtime=False):
     """Log the result of an operation."""
     message = f"{operation}: {result}"
     summary.append(message)
-    if print_message:
+    if print_realtime:
         print(message)
 
 
@@ -84,25 +103,56 @@ def print_summary(summary):
     print(f"\n{success_count}/{len(summary)} operations successful.")
 
 
-def main():
+def update():
     summary = []
 
-    # Perform backups
-    backup_directory(os.path.join("easycut-smartbench", "src", "jobCache"), summary)
-    backup_directory(os.path.join("easycut-smartbench", "src", "sb_values"), summary)
+    # Old open-source easycut directory exists
+    if os.path.exists("easycut-smartbench"):
+        log_operation(summary, "Open-Source Easycut Directory", "FOUND", True)
 
-    # Remove open-source easycut directory
-    remove_directory("easycut-smartbench", summary)
+        # Perform backups
+        backup_directory(os.path.join("easycut-smartbench", "src", "jobCache"), summary)
+        backup_directory(os.path.join("easycut-smartbench", "src", "sb_values"), summary)
 
-    # Replace the start_easycut.sh script
-    replace_file(os.path.join("new", "start_easycut.sh"), "start_easycut.sh", summary)
-    remove_directory("new", summary)
+        # Remove open-source easycut directory
+        remove_directory("easycut-smartbench", summary)
 
-    # Print summary of all operations
-    print_summary(summary)
+        # Replace the start_easycut.sh script
+        replace_file(os.path.join("new", "start_easycut.sh"), "start_easycut.sh", summary)
+        remove_directory("new", summary)
 
-    input("Press Enter to exit...")
+    # New compiled easycut directory exists
+    if os.path.exists("main.exe"):
+        log_operation(summary, "Compiled Easycut", "FOUND", True)
+
+        # Determine installed sw version from [sw_version].txt
+        installed_sw_version = find_sw_version(summary)
+        if not installed_sw_version:
+            return summary
+
+        # Fetch latest tag from GitHub
+        available_sw_version = "3.12.1"
+
+        a, b, c = map(int, installed_sw_version.split("."))
+        d, e, f = map(int, available_sw_version.split("."))
+
+        new_version_available = (a < d) or (a == d and b < e) or (a == d and b == e and c < f)
+
+        # Check if newer version is available
+        if new_version_available:
+            log_operation(summary, "Newer Version Available", "YES")
+
+            # Backup current version
+            backup_directory("main.exe", summary)
+
+            # Remove current version
+            remove_file("main.exe", summary)
+
+            # Download and install new version
+            # download_new_version(available_sw_version, summary)
 
 
 if __name__ == "__main__":
-    main()
+    progress = update()
+    print(progress)
+    input("Press Enter to exit...")
