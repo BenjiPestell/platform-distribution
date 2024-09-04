@@ -2,10 +2,15 @@ import os
 import re
 import shutil
 
+import requests
+
 """
 This script removes the open-source easycut and replaces it with the compiled version.
 Run this script in the /home/pi/ directory.
 """
+
+close_source_repo_owner = "BenjiPestell"
+close_source_repo_name = "platform-distribution"
 
 
 def create_backup_directory():
@@ -66,7 +71,26 @@ def remove_file(file_path, summary):
         log_operation(summary, f"Removal of {file_path}", f"FAILED ({str(e)})")
 
 
-def find_sw_version(summary, directory="."):
+def get_latest_tag(owner, repo, summary):
+    """Get the latest tag of a GitHub repository."""
+    url = f"https://api.github.com/repos/{owner}/{repo}/tags"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        tags = response.json()
+        if tags:
+            latest_tag = tags[0]['name']
+            log_operation(summary, "Found latest tag: ", latest_tag)
+            return latest_tag
+        else:
+            log_operation(summary, "Found latest tag: ", "None")
+            return None
+    else:
+        log_operation(summary, "Get latest tag", f"FAILED ({response.status_code})")
+        response.raise_for_status()
+
+
+def find_local_sw_version(summary, directory="."):
     # Define the pattern to match files like v2.8.1.txt or v3.12.1.txt
     pattern = re.compile(r'^v(\d+\.\d+\.\d+)\.txt$', re.IGNORECASE)
 
@@ -94,8 +118,9 @@ def log_operation(summary, operation, result, print_realtime=False):
 
 def print_summary(summary):
     """Print a summary of all operations."""
-    print("Summary of Operations:")
-    success_count = sum(1 for item in summary if "SUCCESS" in item)
+    if summary:
+        print("Summary of Operations:")
+    success_count = sum(1 for item in summary if "FAIL" not in item)
 
     for item in summary:
         print(item)
@@ -126,12 +151,12 @@ def update():
         log_operation(summary, "Compiled Easycut", "FOUND", True)
 
         # Determine installed sw version from [sw_version].txt
-        installed_sw_version = find_sw_version(summary)
+        installed_sw_version = find_local_sw_version(summary)
         if not installed_sw_version:
             return summary
 
         # Fetch latest tag from GitHub
-        available_sw_version = "3.12.1"
+        available_sw_version = get_latest_tag("yetitool", "easycut-smartbench", summary)
 
         a, b, c = map(int, installed_sw_version.split("."))
         d, e, f = map(int, available_sw_version.split("."))
@@ -151,8 +176,16 @@ def update():
             # Download and install new version
             # download_new_version(available_sw_version, summary)
 
+        else:
+            print("SW is up to date")
+            return summary
+
+    return summary
+
 
 if __name__ == "__main__":
-    progress = update()
-    print(progress)
+    progress = []
+    latest_tag = get_latest_tag(close_source_repo_owner, close_source_repo_name, progress)
+    # progress = update()
+    print_summary(progress)
     input("Press Enter to exit...")
