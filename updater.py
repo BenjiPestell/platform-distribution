@@ -2,7 +2,6 @@ import os
 import re
 import shutil
 import zipfile
-
 import requests
 
 """
@@ -18,6 +17,9 @@ closed_source_repo_name = "platform-distribution"
 
 closed_source_directory = "easycut-new"
 closed_source_executable = os.path.join(closed_source_directory, "new_easycut.exe")
+
+# Open-source directories to backup from easycut-smartbench/src
+dirs_to_backup = ["jobCache", "sb_values"]
 
 # When searching for the SW version file, search in these directories
 search_directories = [".", closed_source_directory, "easycut-smartbench"]
@@ -219,16 +221,6 @@ def retrieve_sw_version_file(source_path, summary):
                 return
 
 
-def write_new_version_file(version, directory, summary):
-    """Write the new version to the [sw_version].txt file."""
-    try:
-        with open(os.path.join(directory, f"{version}.txt"), "w") as file:
-            file.write(version)
-        log_operation(summary, f"Write {version} SW Version File", "SUCCESS")
-    except Exception as e:
-        log_operation(summary, f"Write {version} SW Version File", f"FAILED ({str(e)})")
-
-
 def log_operation(summary, operation, result, print_realtime=False):
     """Log the result of an operation."""
     message = f"{operation}: {result}"
@@ -241,7 +233,7 @@ def print_summary(summary):
     """Print a summary of all operations."""
     if summary:
         print("\nSummary of Operations:")
-    success_count = sum(1 for item in summary if "FAIL" not in item and "NOT" not in item)
+    success_count = sum(1 for item in summary if ("FAIL" not in item and "NOT" not in item) or "CREATED" in item)
 
     for item in summary:
         print(item)
@@ -251,11 +243,13 @@ def print_summary(summary):
 
 def update():
     summary = []
+    backed_up_files = []
     fetch_new_start_easycut_script = False
 
     # Determine installed sw version from [sw_version].txt
     installed_sw_version = find_local_sw_version(summary)
 
+    # If no SW version file found, exit
     if not installed_sw_version:
         print("SW version file not found - Exiting")
         return summary
@@ -263,23 +257,25 @@ def update():
     # Fetch latest tag from GitHub
     available_sw_version = get_latest_tag(closed_source_repo_owner, closed_source_repo_name, summary)
 
+    # Compare installed and available SW versions
     a, b, c = map(int, installed_sw_version[1:].split("."))
     d, e, f = map(int, available_sw_version[1:].split("."))
-
     new_version_available = (a < d) or (a == d and b < e) or (a == d and b == e and c < f)
     ahead_of_remote = (a > d) or (a == d and b > e) or (a == d and b == e and c > f)
-
     if ahead_of_remote:
         print("SW is ahead of remote. How have you managed that?? - Exiting")
         return summary
+    if not new_version_available:
+        print("SW is up to date - Exiting")
+        return summary
 
-    # Old open-source easycut directory exists
+    # Check if old open-source easycut directory exists
     if os.path.exists("easycut-smartbench"):
         log_operation(summary, "Open-Source Easycut Directory", "FOUND")
 
         # Perform backups
-        backup_directory(os.path.join("easycut-smartbench", "src", "jobCache"), summary)
-        backup_directory(os.path.join("easycut-smartbench", "src", "sb_values"), summary)
+        for directory in dirs_to_backup:
+            backup_directory(os.path.join("easycut-smartbench", "src", directory), summary)
 
         # Remove open-source easycut directory
         remove_directory("easycut-smartbench", summary)
@@ -287,20 +283,17 @@ def update():
         # Replace the start_easycut.sh script
         fetch_new_start_easycut_script = True
 
-    # New compiled easycut directory exists
+    # Check if new compiled easycut directory exists
     if os.path.exists(closed_source_directory):
         log_operation(summary, "Compiled Easycut", "FOUND")
 
-        if new_version_available:
-            # Backup current version
-            backup_file(closed_source_executable, summary)
-
-            # Remove current version
-            remove_file(closed_source_executable, summary)
-
-        else:
-            print("SW is up to date - Exiting")
-            return summary
+        # Backup and delete current version
+        backup_file(closed_source_executable, summary)
+        remove_file(closed_source_executable, summary)
+    else:
+        # Create new compiled easycut directory
+        os.makedirs(closed_source_directory)
+        log_operation(summary, "Compiled Easycut", "NOT FOUND, CREATED")
 
     # New version available, perform update
     log_operation(summary, "Newer Version Available", "YES")
@@ -313,14 +306,20 @@ def update():
     if fetch_new_start_easycut_script:
         replace_file(os.path.join(closed_source_directory, "assets", "start_easycut.sh"), "start_easycut.sh", summary)
 
-    # # Write new version to [sw_version].txt
-    # write_new_version_file(available_sw_version, closed_source_directory, summary)
-
     # Fetch new SW version file
     retrieve_sw_version_file(os.path.join(closed_source_directory, "assets"), summary)
 
     # Delete old version file
     remove_file(f"{installed_sw_version}.txt", summary)
+
+    # Fetch any backed-up files from open-source easycut
+    if os.path.exists("backup"):
+        for file in os.listdir("backup"):
+            if not file.endswith(".exe"):  # Skip the backup of the closed-source executable
+                shutil.move(os.path.join("backup", file), file)
+                backed_up_files.append(file)
+    if backed_up_files:
+        log_operation(summary, "Backed-Up Files", ", ".join(backed_up_files))
 
     # Delete backup directory
     remove_directory("backup", summary)
