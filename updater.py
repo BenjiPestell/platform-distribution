@@ -312,11 +312,11 @@ def update():
     # Delete old version file
     remove_file(f"{installed_sw_version}.txt", summary)
 
-    # Fetch any backed-up files from open-source easycut
+    # Position any backed-up files from open-source easycut
     if os.path.exists("backup"):
         for file in os.listdir("backup"):
             if not file.endswith(".exe"):  # Skip the backup of the closed-source executable
-                shutil.move(os.path.join("backup", file), file)
+                shutil.move(os.path.join("backup", file), os.path.join(closed_source_directory, file))
                 backed_up_files.append(file)
     if backed_up_files:
         log_operation(summary, "Backed-Up Files", ", ".join(backed_up_files))
