@@ -4,9 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9c9dd300-d9fc-499d-969c-04b6100be3a4" name="Changes" comment="Upload WIP">
+    <list default="true" id="9c9dd300-d9fc-499d-969c-04b6100be3a4" name="Changes" comment="Fix for case where no easycut whatsoever">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/dist/updater.exe" beforeDir="false" afterPath="$PROJECT_DIR$/dist/updater.exe" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/updater.py" beforeDir="false" afterPath="$PROJECT_DIR$/updater.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -117,7 +116,7 @@
       <workItem from="1725619432779" duration="7523000" />
       <workItem from="1725636946127" duration="32000" />
       <workItem from="1725637182623" duration="1841000" />
-      <workItem from="1725861837020" duration="3787000" />
+      <workItem from="1725861837020" duration="4930000" />
     </task>
     <task id="LOCAL-00001" summary="Project files">
       <option name="closed" value="true" />
@@ -223,7 +222,15 @@
       <option name="project" value="LOCAL" />
       <updated>1725861857181</updated>
     </task>
-    <option name="localTasksCounter" value="14" />
+    <task id="LOCAL-00014" summary="Fix for case where no easycut whatsoever">
+      <option name="closed" value="true" />
+      <created>1725866574793</created>
+      <option name="number" value="00014" />
+      <option name="presentableId" value="LOCAL-00014" />
+      <option name="project" value="LOCAL" />
+      <updated>1725866574793</updated>
+    </task>
+    <option name="localTasksCounter" value="15" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -249,7 +256,8 @@
     <MESSAGE value="Add remove_file support" />
     <MESSAGE value="Add new_easycut.py and .exe" />
     <MESSAGE value="Upload WIP" />
-    <option name="LAST_COMMIT_MESSAGE" value="Upload WIP" />
+    <MESSAGE value="Fix for case where no easycut whatsoever" />
+    <option name="LAST_COMMIT_MESSAGE" value="Fix for case where no easycut whatsoever" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/Platform_distribution$migrate.coverage" NAME="migrate Coverage Results" MODIFIED="1725376462767" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

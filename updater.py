@@ -48,9 +48,9 @@ def backup_directory(source_path, summary):
         shutil.copytree(source_path, destination_path)
         log_operation(summary, f"Backup of {dir_name}", "SUCCESS")
     except FileNotFoundError:
-        log_operation(summary, f"Backup of {dir_name}", "FAILED (Not Found)")
+        log_operation(summary, f"Backup of {dir_name}", "FAILED (Not Found)", critical=True)
     except Exception as e:
-        log_operation(summary, f"Backup of {dir_name}", f"FAILED ({str(e)})")
+        log_operation(summary, f"Backup of {dir_name}", f"FAILED ({str(e)})", critical=True)
 
 
 def backup_file(source_path, summary):
@@ -64,9 +64,9 @@ def backup_file(source_path, summary):
         shutil.copy2(source_path, destination_path)
         log_operation(summary, f"Backup of {file_name}", "SUCCESS")
     except FileNotFoundError:
-        log_operation(summary, f"Backup of {file_name}", "FAILED (Not Found)")
+        log_operation(summary, f"Backup of {file_name}", "FAILED (Not Found)", critical=True)
     except Exception as e:
-        log_operation(summary, f"Backup of {file_name}", f"FAILED ({str(e)})")
+        log_operation(summary, f"Backup of {file_name}", f"FAILED ({str(e)})", critical=True)
 
 
 def replace_file(source_path, destination_path, summary):
@@ -75,9 +75,9 @@ def replace_file(source_path, destination_path, summary):
         shutil.copy2(source_path, destination_path)
         log_operation(summary, f"Replacement of {destination_path}", "SUCCESS")
     except FileNotFoundError:
-        log_operation(summary, f"Replacement of {destination_path}", "FAILED (Source Not Found)")
+        log_operation(summary, f"Replacement of {destination_path}", "FAILED (Source Not Found)", critical=True)
     except Exception as e:
-        log_operation(summary, f"Replacement of {destination_path}", f"FAILED ({str(e)})")
+        log_operation(summary, f"Replacement of {destination_path}", f"FAILED ({str(e)})", critical=True)
 
 
 def remove_directory(directory_path, summary):
@@ -88,9 +88,9 @@ def remove_directory(directory_path, summary):
     except FileNotFoundError:
         log_operation(summary, f"Removal of {directory_path}", "FAILED (Not Found)")
     except PermissionError:
-        log_operation(summary, f"Removal of {directory_path}", "FAILED (Permission Denied)")
+        log_operation(summary, f"Removal of {directory_path}", "FAILED (Permission Denied)", critical=True)
     except Exception as e:
-        log_operation(summary, f"Removal of {directory_path}", f"FAILED ({str(e)})")
+        log_operation(summary, f"Removal of {directory_path}", f"FAILED ({str(e)})", critical=True)
 
 
 def remove_file(filename, summary):
@@ -106,9 +106,9 @@ def remove_file(filename, summary):
             except FileNotFoundError:
                 log_operation(summary, f"Removal of {filename}", "FAILED (Not Found)")
             except PermissionError:
-                log_operation(summary, f"Removal of {filename}", "FAILED (Permission Denied)")
+                log_operation(summary, f"Removal of {filename}", "FAILED (Permission Denied)", critical=True)
             except Exception as e:
-                log_operation(summary, f"Removal of {filename}", f"FAILED ({str(e)})")
+                log_operation(summary, f"Removal of {filename}", f"FAILED ({str(e)})", critical=True)
                 return
 
 
@@ -124,10 +124,10 @@ def get_latest_tag(owner, repo, summary):
             log_operation(summary, "Found latest tag: ", latest_tag)
             return latest_tag
         else:
-            log_operation(summary, "Found latest tag: ", "None")
+            log_operation(summary, "Found latest tag: ", "None", critical=True)
             return None
     else:
-        log_operation(summary, "Get latest tag", f"FAILED ({response.status_code})")
+        log_operation(summary, "Get latest tag", f"FAILED ({response.status_code})", critical=True)
         response.raise_for_status()
 
 
@@ -178,7 +178,7 @@ def download_assets_from_tag(owner, repo, tag_name, directory, summary, extract_
         assets = release.get('assets', [])
 
         if not assets:
-            print("No assets found for the given tag.")
+            log_operation(summary, "Download content from tag", "FAILED (No assets found)")
             return
 
         for asset in assets:
@@ -222,9 +222,10 @@ def retrieve_sw_version_file(source_path, summary):
                 return
 
 
-def log_operation(summary, operation, result, print_realtime=False):
+def log_operation(summary, operation, result, critical=False, print_realtime=False):
     """Log the result of an operation."""
-    message = f"{operation}: {result}"
+    critical_message = "CRITICAL: " if critical else ""
+    message = f"{critical_message}{operation}: {result}"
     summary.append(message)
     if print_realtime:
         print(message)
@@ -234,7 +235,8 @@ def print_summary(summary):
     """Print a summary of all operations."""
     if summary:
         print("\nSummary of Operations:")
-    success_count = sum(1 for item in summary if ("FAIL" not in item and "NOT" not in item) or "CREATED" in item or "Assuming" in item)
+    critical_count = sum("CRITICAL" in item for item in summary)
+    success_count = len(summary) - critical_count
 
     for item in summary:
         print(item)
