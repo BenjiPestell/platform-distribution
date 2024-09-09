@@ -215,8 +215,8 @@ def retrieve_sw_version_file(source_path, summary):
             match_1 = pattern_1.match(file)
             match_2 = pattern_2.match(file)
             if match_1 or match_2:
-                # Copy the file to the current directory
-                shutil.copy2(os.path.join(source_path, file), file)
+                # Copy the file to the closed-source directory
+                shutil.copy2(os.path.join(source_path, file), os.path.join(closed_source_directory, file))
                 log_operation(summary, f"Retrieve {file}", "SUCCESS")
                 return
 

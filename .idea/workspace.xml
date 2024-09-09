@@ -6,6 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="9c9dd300-d9fc-499d-969c-04b6100be3a4" name="Changes" comment="Upload WIP">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/updater.exe" beforeDir="false" afterPath="$PROJECT_DIR$/dist/updater.exe" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/updater.py" beforeDir="false" afterPath="$PROJECT_DIR$/updater.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -115,6 +116,7 @@
       <workItem from="1725524473767" duration="16000000" />
       <workItem from="1725619432779" duration="7523000" />
       <workItem from="1725636946127" duration="32000" />
+      <workItem from="1725637182623" duration="1841000" />
     </task>
     <task id="LOCAL-00001" summary="Project files">
       <option name="closed" value="true" />
@@ -204,7 +206,15 @@
       <option name="project" value="LOCAL" />
       <updated>1725636422738</updated>
     </task>
-    <option name="localTasksCounter" value="12" />
+    <task id="LOCAL-00012" summary="Upload WIP">
+      <option name="closed" value="true" />
+      <created>1725637248013</created>
+      <option name="number" value="00012" />
+      <option name="presentableId" value="LOCAL-00012" />
+      <option name="project" value="LOCAL" />
+      <updated>1725637248013</updated>
+    </task>
+    <option name="localTasksCounter" value="13" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
