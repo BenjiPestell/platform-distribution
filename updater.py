@@ -19,6 +19,7 @@ closed_source_directory = "easycut-new"
 closed_source_executable = os.path.join(closed_source_directory, "new_easycut.exe")
 
 # Open-source directories to backup from easycut-smartbench/src
+backup_dir = "backup"
 dirs_to_backup = ["jobCache", "sb_values"]
 
 # When searching for the SW version file, search in these directories
@@ -33,7 +34,7 @@ pattern_2 = re.compile(r'^v(\d+\d+\d+)(_.+)?\.txt$', re.IGNORECASE)
 
 def create_backup_directory():
     """Ensure the backup directory exists."""
-    os.makedirs("backup", exist_ok=True)
+    os.makedirs(backup_dir, exist_ok=True)
 
 
 def backup_directory(source_path, summary):
@@ -41,7 +42,7 @@ def backup_directory(source_path, summary):
     create_backup_directory()
 
     dir_name = os.path.basename(source_path)
-    destination_path = os.path.join("backup", dir_name)
+    destination_path = os.path.join(backup_dir, dir_name)
 
     try:
         shutil.copytree(source_path, destination_path)
@@ -57,7 +58,7 @@ def backup_file(source_path, summary):
     create_backup_directory()
 
     file_name = os.path.basename(source_path)
-    destination_path = os.path.join("backup", file_name)
+    destination_path = os.path.join(backup_dir, file_name)
 
     try:
         shutil.copy2(source_path, destination_path)
@@ -156,8 +157,8 @@ def find_local_sw_version(summary, directory=os.getcwd()):
                     log_operation(summary, f"SW Version {sw_version_string} File", "FOUND")
                     return sw_version_string
 
-    log_operation(summary, "SW Version File", "NOT FOUND")
-    return None
+    log_operation(summary, "SW Version File", "NOT FOUND. Assuming v0.0.0")
+    return "v0.0.0"
 
 
 def download_assets_from_tag(owner, repo, tag_name, directory, summary, extract_zips=True):
@@ -233,7 +234,7 @@ def print_summary(summary):
     """Print a summary of all operations."""
     if summary:
         print("\nSummary of Operations:")
-    success_count = sum(1 for item in summary if ("FAIL" not in item and "NOT" not in item) or "CREATED" in item)
+    success_count = sum(1 for item in summary if ("FAIL" not in item and "NOT" not in item) or "CREATED" in item or "Assuming" in item)
 
     for item in summary:
         print(item)
@@ -249,10 +250,8 @@ def update():
     # Determine installed sw version from [sw_version].txt
     installed_sw_version = find_local_sw_version(summary)
 
-    # If no SW version file found, exit
-    if not installed_sw_version:
-        print("SW version file not found - Exiting")
-        return summary
+    if installed_sw_version == "v0.0.0":
+        fetch_new_start_easycut_script = True
 
     # Fetch latest tag from GitHub
     available_sw_version = get_latest_tag(closed_source_repo_owner, closed_source_repo_name, summary)
@@ -293,7 +292,7 @@ def update():
     else:
         # Create new compiled easycut directory
         os.makedirs(closed_source_directory)
-        log_operation(summary, "Compiled Easycut", "NOT FOUND, CREATED")
+        log_operation(summary, "Compiled Easycut directory", "NOT FOUND, CREATED")
 
     # New version available, perform update
     log_operation(summary, "Newer Version Available", "YES")
@@ -310,19 +309,19 @@ def update():
     retrieve_sw_version_file(os.path.join(closed_source_directory, "assets"), summary)
 
     # Delete old version file
-    remove_file(f"{installed_sw_version}.txt", summary)
+    remove_file(f"{installed_sw_version.replace('.', '')}.txt", summary)
 
     # Position any backed-up files from open-source easycut
-    if os.path.exists("backup"):
-        for file in os.listdir("backup"):
+    if os.path.exists(backup_dir):
+        for file in os.listdir(backup_dir):
             if not file.endswith(".exe"):  # Skip the backup of the closed-source executable
-                shutil.move(os.path.join("backup", file), os.path.join(closed_source_directory, file))
+                shutil.move(os.path.join(backup_dir, file), os.path.join(closed_source_directory, file))
                 backed_up_files.append(file)
     if backed_up_files:
-        log_operation(summary, "Backed-Up Files", ", ".join(backed_up_files))
+        log_operation(summary, "Backed-Up & Positioned Files", ", ".join(backed_up_files))
 
     # Delete backup directory
-    remove_directory("backup", summary)
+    remove_directory(backup_dir, summary)
 
     return summary
 
