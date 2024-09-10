@@ -251,8 +251,11 @@ def update():
 
     # Determine installed sw version from [sw_version].txt
     installed_sw_version = find_local_sw_version(summary)
-
     if installed_sw_version == "v0.0.0":
+        fetch_new_start_easycut_script = True
+
+    # Check for start_easycut.sh script
+    if not os.path.exists("start_easycut.sh"):
         fetch_new_start_easycut_script = True
 
     # Fetch latest tag from GitHub
@@ -266,7 +269,8 @@ def update():
     if ahead_of_remote:
         print("SW is ahead of remote. How have you managed that?? - Exiting")
         return summary
-    if not new_version_available:
+
+    if not new_version_available and not fetch_new_start_easycut_script:
         print("SW is up to date - Exiting")
         return summary
 
