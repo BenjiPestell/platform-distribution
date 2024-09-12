@@ -4,7 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="9c9dd300-d9fc-499d-969c-04b6100be3a4" name="Changes" comment="Check for start_easycut.sh as well as sw version">
+    <list default="true" id="9c9dd300-d9fc-499d-969c-04b6100be3a4" name="Changes" comment="Implement classes for GitHub and USB storage">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/updater.py" beforeDir="false" afterPath="$PROJECT_DIR$/updater.py" afterDir="false" />
     </list>
@@ -121,6 +121,7 @@
       <workItem from="1725957394300" duration="1426000" />
       <workItem from="1726051195190" duration="11000" />
       <workItem from="1726129978203" duration="7179000" />
+      <workItem from="1726151349881" duration="5372000" />
     </task>
     <task id="LOCAL-00001" summary="Project files">
       <option name="closed" value="true" />
@@ -250,7 +251,15 @@
       <option name="project" value="LOCAL" />
       <updated>1725957421473</updated>
     </task>
-    <option name="localTasksCounter" value="17" />
+    <task id="LOCAL-00017" summary="Implement classes for GitHub and USB storage">
+      <option name="closed" value="true" />
+      <created>1726151821304</created>
+      <option name="number" value="00017" />
+      <option name="presentableId" value="LOCAL-00017" />
+      <option name="project" value="LOCAL" />
+      <updated>1726151821304</updated>
+    </task>
+    <option name="localTasksCounter" value="18" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -279,7 +288,8 @@
     <MESSAGE value="Fix for case where no easycut whatsoever" />
     <MESSAGE value="Add critical argument to logging" />
     <MESSAGE value="Check for start_easycut.sh as well as sw version" />
-    <option name="LAST_COMMIT_MESSAGE" value="Check for start_easycut.sh as well as sw version" />
+    <MESSAGE value="Implement classes for GitHub and USB storage" />
+    <option name="LAST_COMMIT_MESSAGE" value="Implement classes for GitHub and USB storage" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/Platform_distribution$migrate.coverage" NAME="migrate Coverage Results" MODIFIED="1725376462767" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />

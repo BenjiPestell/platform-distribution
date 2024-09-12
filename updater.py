@@ -21,6 +21,11 @@ closed_source_executable = os.path.join(closed_source_directory, "new_easycut.ex
 
 default_sw_version = "v0.0.0"
 
+open_source_directory = "easycut-smartbench"
+
+# Essential basic requirements
+basic_requirements = ["start_easycut.sh"]
+
 # Open-source directories to backup from easycut-smartbench/src
 backup_dir = "backup"
 dirs_to_backup = ["jobCache", "sb_values"]
@@ -41,6 +46,9 @@ class GitHub(object):
     def __init__(self, owner, repo):
         self.owner = owner
         self.repo = repo
+
+    def get_sw_version(self, *kwargs):
+        return self.get_latest_tag(*kwargs)
 
     def get_latest_tag(self, owner=None, repo=None):
         """Get the latest tag of a GitHub repository."""
@@ -314,102 +322,58 @@ def print_summary():
 
 
 def update():
-    backed_up_files = []
-    fetch_new_start_easycut_script = False
-
-    # Create GitHub object
-    gh = GitHub(closed_source_repo_owner, closed_source_repo_name)
-
-    # Check for USB storage
     usb = USB_Storage()
+
+    # Check if the USB storage is available, otherwise use GitHub
     if usb.is_available():
-        log_operation("USB Storage", "FOUND")
-        usb_sw_version = usb.get_sw_version()
-        if usb_sw_version:
-            # Download and install new version
-            usb.download_content(directory=closed_source_directory)
-            return
+        log_operation("USB Storage", "FOUND", print_realtime=True)
+        update_source = usb
+    else:
+        log_operation("USB Storage", "NOT FOUND", critical=False, print_realtime=True)
+        update_source = GitHub(closed_source_repo_owner, closed_source_repo_name)
 
-    # Determine installed sw version from [sw_version].txt
-    installed_sw_version = find_local_sw_version()
-    if installed_sw_version == default_sw_version:
-        fetch_new_start_easycut_script = True
+    # Determine the currently installed SW version
+    local_sw_version = find_local_sw_version()
 
-    # Check for start_easycut.sh script
-    if not os.path.exists("start_easycut.sh"):
-        fetch_new_start_easycut_script = True
-
-    # Fetch latest tag from GitHub
-    available_sw_version = gh.get_latest_tag()
+    # Determine the latest available SW version
+    latest_sw_version = update_source.get_sw_version()
 
     # Compare installed and available SW versions
-    a, b, c = map(int, installed_sw_version[1:].split("."))
-    d, e, f = map(int, available_sw_version[1:].split("."))
+    a, b, c = map(int, local_sw_version[1:].split("."))
+    d, e, f = map(int, latest_sw_version[1:].split("."))
+
     new_version_available = (a < d) or (a == d and b < e) or (a == d and b == e and c < f)
     ahead_of_remote = (a > d) or (a == d and b > e) or (a == d and b == e and c > f)
+
+    # Check for basic requirements
+    basic_requirements_met = True
+    for file in basic_requirements:
+        if os.path.exists(file):
+            log_operation(f"Basic Requirement {file}", "FOUND")
+        else:
+            basic_requirements_met = False
+            log_operation(f"Basic Requirement {file}", "NOT FOUND", critical=True)
+
     if ahead_of_remote:
         print("SW is ahead of remote. How have you managed that?? - Exiting")
         return
 
-    if not new_version_available and not fetch_new_start_easycut_script:
+    if not new_version_available and basic_requirements_met:
         print("SW is up to date - Exiting")
-        return
 
-    # Check if old open-source easycut directory exists
-    if os.path.exists("easycut-smartbench"):
-        log_operation("Open-Source Easycut Directory", "FOUND")
+    # Check for old open-source directory
+    if os.path.exists(open_source_directory):
+        log_operation(f"Old Open-Source Directory {open_source_directory}", "FOUND")
 
-        # Perform backups
+        # Perform backups from src folder
         for directory in dirs_to_backup:
-            backup_directory(os.path.join("easycut-smartbench", "src", directory))
+            backup_directory(os.path.join(open_source_directory, "src", directory))
 
         # Remove open-source easycut directory
         remove_directory("easycut-smartbench")
 
-        # Replace the start_easycut.sh script
-        fetch_new_start_easycut_script = True
-
-    # Check if new compiled easycut directory exists
-    if os.path.exists(closed_source_directory):
-        log_operation("Compiled Easycut", "FOUND")
-
-        # Backup and delete current version
-        backup_file(closed_source_executable)
-        remove_file(closed_source_executable)
-    else:
-        # Create new compiled easycut directory
-        os.makedirs(closed_source_directory)
-        log_operation("Compiled Easycut directory", "NOT FOUND, CREATED")
-
-    # New version available, perform update
-    log_operation("Newer Version Available", "YES")
-
-    # Download and install new version
-    gh.download_content(tag_name=available_sw_version, directory=closed_source_directory)
-
-    # Replace the start_easycut.sh script if necessary
-    if fetch_new_start_easycut_script:
-        replace_file(os.path.join(closed_source_directory, "assets", "start_easycut.sh"), "start_easycut.sh")
-
-    # Fetch new SW version file
-    retrieve_sw_version_file(os.path.join(closed_source_directory, "assets"))
-
-    # Delete old version file
-    remove_file(f"{installed_sw_version.replace('.', '')}.txt")
-
-    # Position any backed-up files from open-source easycut
-    if os.path.exists(backup_dir):
-        for file in os.listdir(backup_dir):
-            if not file.endswith(".exe"):  # Skip the backup of the closed-source executable
-                shutil.move(os.path.join(backup_dir, file), os.path.join(closed_source_directory, file))
-                backed_up_files.append(file)
-    if backed_up_files:
-        log_operation("Backed-Up & Positioned Files", ", ".join(backed_up_files))
-
-    # Delete backup directory
-    remove_directory(backup_dir)
-
-    return
+    # Download the latest SW version
+    update_source.download_content()  # All this still needs to be positioned correctly
 
 
 if __name__ == "__main__":
