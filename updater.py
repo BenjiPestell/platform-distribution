@@ -1,4 +1,5 @@
 import os
+import sys
 import re
 import shutil
 import zipfile
@@ -18,6 +19,8 @@ closed_source_repo_name = "platform-distribution"
 closed_source_directory = "easycut-new"
 closed_source_executable = os.path.join(closed_source_directory, "new_easycut.exe")
 
+default_sw_version = "v0.0.0"
+
 # Open-source directories to backup from easycut-smartbench/src
 backup_dir = "backup"
 dirs_to_backup = ["jobCache", "sb_values"]
@@ -26,10 +29,142 @@ dirs_to_backup = ["jobCache", "sb_values"]
 search_directories = [".", closed_source_directory, "easycut-smartbench"]
 
 # Pattern to match files like v2.8.1.txt or v3.12.1.txt (with or without extra text)
-pattern_1 = re.compile(r'^v(\d+\.\d+\.\d+)(_.+)?\.txt$', re.IGNORECASE)
+sw_filename_pattern_1 = re.compile(r'^v(\d+\.\d+\.\d+)(_.+)?\.txt$', re.IGNORECASE)
 
 # Pattern to match files like v281.txt or v231.txt (with or without extra text)
-pattern_2 = re.compile(r'^v(\d+\d+\d+)(_.+)?\.txt$', re.IGNORECASE)
+sw_filename_pattern_2 = re.compile(r'^v(\d+\d+\d+)(_.+)?\.txt$', re.IGNORECASE)
+
+summary = []
+
+
+class GitHub(object):
+    def __init__(self, owner, repo):
+        self.owner = owner
+        self.repo = repo
+
+    def get_latest_tag(self, owner=None, repo=None):
+        """Get the latest tag of a GitHub repository."""
+
+        owner = owner or self.owner
+        repo = repo or self.repo
+
+        url = f"https://api.github.com/repos/{owner}/{repo}/tags"
+        response = requests.get(url)
+
+        if response.status_code == 200:
+            tags = response.json()
+            if tags:
+                latest_tag = tags[0]['name']
+                log_operation("Found latest tag: ", latest_tag)
+                return latest_tag
+            else:
+                log_operation("Found latest tag: ", "None", critical=True)
+                return None
+        else:
+            log_operation("Get latest tag", f"FAILED ({response.status_code})", critical=True)
+            response.raise_for_status()
+
+    def download_content(self, owner=None, repo=None, tag_name=None, directory=None, extract_zips=True):
+        """
+        Download all content associated with a given tag and save them in the current directory.
+        Optionally, extract zip files.
+        """
+
+        owner = owner or self.owner
+        repo = repo or self.repo
+
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
+        url = f"https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag_name}"
+        response = requests.get(url)
+
+        if response.status_code == 200:
+            release = response.json()
+            assets = release.get('assets', [])
+
+            if not assets:
+                log_operation("Download content from tag", "FAILED (No assets found)")
+                return
+
+            for asset in assets:
+                asset_name = asset['name']
+                download_url = asset['browser_download_url']
+
+                print(f"Downloading {asset_name}...")
+
+                # Stream the download to avoid loading it all in memory
+                asset_path = os.path.join(directory, asset_name)
+                with requests.get(download_url, stream=True) as r:
+                    r.raise_for_status()
+                    with open(asset_path, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
+
+                # Extract zip files if extract_zips is True
+                if extract_zips and asset_name.endswith('.zip'):
+                    # noinspection PyTypeChecker
+                    with zipfile.ZipFile(asset_path, 'r') as zip_ref:
+                        zip_ref.extractall(directory)
+                    os.remove(os.path.join(directory, asset_name))
+
+            log_operation("Download content from tag", "SUCCESS")
+
+        else:
+            response.raise_for_status()
+
+
+class USB_Storage(object):
+    windows_usb_path = "E:\\"
+    linux_usb_path = "/media/usb/"
+
+    def __int__(self):
+        if sys.platform == "win32":
+            self.usb_path = self.windows_usb_path
+        else:
+            self.usb_path = self.linux_usb_path
+
+    def is_available(self):
+        return os.path.exists(self.usb_path)
+
+    def get_sw_version(self):
+        if not self.is_available():
+            return None
+
+        for file in os.listdir(self.usb_path):
+            match_1 = sw_filename_pattern_1.match(file)
+            match_2 = sw_filename_pattern_2.match(file)
+            if match_1:
+                # Extract the version part from the filename
+                sw_version = match_1.group(1)
+                sw_version_string = f"v{sw_version}"
+                log_operation(f"USB SW Version {sw_version_string} File", "FOUND")
+                return sw_version_string
+            elif match_2:
+                # Extract the version part from the filename
+                sw_version = match_2.group(1)
+                sw_version_string = "v" + ".".join([sw_version[i:i + 1] for i in range(0, len(sw_version), 1)])
+                log_operation(f"USB SW Version {sw_version_string} File", "FOUND")
+                return sw_version_string
+
+        log_operation("USB SW Version File", "NOT FOUND")
+        return None
+
+    def download_content(self, directory=None, extract_zips=True):
+        directory = directory or closed_source_directory
+
+        if not self.is_available():
+            return
+
+        for file in os.listdir(self.usb_path):
+            shutil.copy2(os.path.join(self.usb_path, file), closed_source_directory)
+
+            # Extract zip files if extract_zips is True
+            if extract_zips and file.endswith('.zip'):
+                # noinspection PyTypeChecker
+                with zipfile.ZipFile(file, 'r') as zip_ref:
+                    zip_ref.extractall(directory)
+                os.remove(os.path.join(directory, file))
 
 
 def create_backup_directory():
@@ -37,7 +172,7 @@ def create_backup_directory():
     os.makedirs(backup_dir, exist_ok=True)
 
 
-def backup_directory(source_path, summary):
+def backup_directory(source_path):
     """Back up the specified directory to the backup folder."""
     create_backup_directory()
 
@@ -46,14 +181,14 @@ def backup_directory(source_path, summary):
 
     try:
         shutil.copytree(source_path, destination_path)
-        log_operation(summary, f"Backup of {dir_name}", "SUCCESS")
+        log_operation(f"Backup of {dir_name}", "SUCCESS")
     except FileNotFoundError:
-        log_operation(summary, f"Backup of {dir_name}", "FAILED (Not Found)", critical=True)
+        log_operation(f"Backup of {dir_name}", "FAILED (Not Found)", critical=True)
     except Exception as e:
-        log_operation(summary, f"Backup of {dir_name}", f"FAILED ({str(e)})", critical=True)
+        log_operation(f"Backup of {dir_name}", f"FAILED ({str(e)})", critical=True)
 
 
-def backup_file(source_path, summary):
+def backup_file(source_path):
     """Back up the specified file to the backup folder."""
     create_backup_directory()
 
@@ -62,38 +197,38 @@ def backup_file(source_path, summary):
 
     try:
         shutil.copy2(source_path, destination_path)
-        log_operation(summary, f"Backup of {file_name}", "SUCCESS")
+        log_operation(f"Backup of {file_name}", "SUCCESS")
     except FileNotFoundError:
-        log_operation(summary, f"Backup of {file_name}", "FAILED (Not Found)", critical=True)
+        log_operation(f"Backup of {file_name}", "FAILED (Not Found)", critical=True)
     except Exception as e:
-        log_operation(summary, f"Backup of {file_name}", f"FAILED ({str(e)})", critical=True)
+        log_operation(f"Backup of {file_name}", f"FAILED ({str(e)})", critical=True)
 
 
-def replace_file(source_path, destination_path, summary):
+def replace_file(source_path, destination_path):
     """Replace the destination file with the source file."""
     try:
         shutil.copy2(source_path, destination_path)
-        log_operation(summary, f"Replacement of {destination_path}", "SUCCESS")
+        log_operation(f"Replacement of {destination_path}", "SUCCESS")
     except FileNotFoundError:
-        log_operation(summary, f"Replacement of {destination_path}", "FAILED (Source Not Found)", critical=True)
+        log_operation(f"Replacement of {destination_path}", "FAILED (Source Not Found)", critical=True)
     except Exception as e:
-        log_operation(summary, f"Replacement of {destination_path}", f"FAILED ({str(e)})", critical=True)
+        log_operation(f"Replacement of {destination_path}", f"FAILED ({str(e)})", critical=True)
 
 
-def remove_directory(directory_path, summary):
+def remove_directory(directory_path):
     """Remove the specified directory."""
     try:
         shutil.rmtree(directory_path)
-        log_operation(summary, f"Removal of {directory_path}", "SUCCESS")
+        log_operation(f"Removal of {directory_path}", "SUCCESS")
     except FileNotFoundError:
-        log_operation(summary, f"Removal of {directory_path}", "FAILED (Not Found)")
+        log_operation(f"Removal of {directory_path}", "FAILED (Not Found)")
     except PermissionError:
-        log_operation(summary, f"Removal of {directory_path}", "FAILED (Permission Denied)", critical=True)
+        log_operation(f"Removal of {directory_path}", "FAILED (Permission Denied)", critical=True)
     except Exception as e:
-        log_operation(summary, f"Removal of {directory_path}", f"FAILED ({str(e)})", critical=True)
+        log_operation(f"Removal of {directory_path}", f"FAILED ({str(e)})", critical=True)
 
 
-def remove_file(filename, summary):
+def remove_file(filename):
     """Remove the specified file."""
 
     for directory in search_directories:
@@ -101,37 +236,18 @@ def remove_file(filename, summary):
         if os.path.exists(file_path):
             try:
                 os.remove(file_path)
-                log_operation(summary, f"Removal of {filename}", "SUCCESS")
+                log_operation(f"Removal of {filename}", "SUCCESS")
                 return
             except FileNotFoundError:
-                log_operation(summary, f"Removal of {filename}", "FAILED (Not Found)")
+                log_operation(f"Removal of {filename}", "FAILED (Not Found)")
             except PermissionError:
-                log_operation(summary, f"Removal of {filename}", "FAILED (Permission Denied)", critical=True)
+                log_operation(f"Removal of {filename}", "FAILED (Permission Denied)", critical=True)
             except Exception as e:
-                log_operation(summary, f"Removal of {filename}", f"FAILED ({str(e)})", critical=True)
+                log_operation(f"Removal of {filename}", f"FAILED ({str(e)})", critical=True)
                 return
 
 
-def get_latest_tag(owner, repo, summary):
-    """Get the latest tag of a GitHub repository."""
-    url = f"https://api.github.com/repos/{owner}/{repo}/tags"
-    response = requests.get(url)
-
-    if response.status_code == 200:
-        tags = response.json()
-        if tags:
-            latest_tag = tags[0]['name']
-            log_operation(summary, "Found latest tag: ", latest_tag)
-            return latest_tag
-        else:
-            log_operation(summary, "Found latest tag: ", "None", critical=True)
-            return None
-    else:
-        log_operation(summary, "Get latest tag", f"FAILED ({response.status_code})", critical=True)
-        response.raise_for_status()
-
-
-def find_local_sw_version(summary, directory=os.getcwd()):
+def find_local_sw_version(directory=os.getcwd()):
     """Find the SW version file in the specified directory."""
 
     if not os.path.exists(directory):
@@ -142,87 +258,40 @@ def find_local_sw_version(summary, directory=os.getcwd()):
         if os.path.exists(directory):
             files = os.listdir(directory)
             for file in files:
-                match_1 = pattern_1.match(file)
-                match_2 = pattern_2.match(file)
+                match_1 = sw_filename_pattern_1.match(file)
+                match_2 = sw_filename_pattern_2.match(file)
                 if match_1:
                     # Extract the version part from the filename
                     sw_version = match_1.group(1)
                     sw_version_string = f"v{sw_version}"
-                    log_operation(summary, f"SW Version {sw_version_string} File", "FOUND")
+                    log_operation(f"SW Version {sw_version_string} File", "FOUND")
                     return sw_version_string
                 elif match_2:
                     # Extract the version part from the filename
                     sw_version = match_2.group(1)
                     sw_version_string = "v" + ".".join([sw_version[i:i + 1] for i in range(0, len(sw_version), 1)])
-                    log_operation(summary, f"SW Version {sw_version_string} File", "FOUND")
+                    log_operation(f"SW Version {sw_version_string} File", "FOUND")
                     return sw_version_string
 
-    log_operation(summary, "SW Version File", "NOT FOUND. Assuming v0.0.0")
-    return "v0.0.0"
+    log_operation("SW Version File", "NOT FOUND. Assuming {}".format(default_sw_version))
+    return default_sw_version
 
 
-def download_assets_from_tag(owner, repo, tag_name, directory, summary, extract_zips=True):
-    """
-    Download all assets associated with a given tag and save them in the current directory.
-    Optionally, extract zip files.
-    """
-
-    if not os.path.exists(directory):
-        os.makedirs(directory)
-
-    url = f"https://api.github.com/repos/{owner}/{repo}/releases/tags/{tag_name}"
-    response = requests.get(url)
-
-    if response.status_code == 200:
-        release = response.json()
-        assets = release.get('assets', [])
-
-        if not assets:
-            log_operation(summary, "Download content from tag", "FAILED (No assets found)")
-            return
-
-        for asset in assets:
-            asset_name = asset['name']
-            download_url = asset['browser_download_url']
-
-            print(f"Downloading {asset_name}...")
-
-            # Stream the download to avoid loading it all in memory
-            asset_path = os.path.join(directory, asset_name)
-            with requests.get(download_url, stream=True) as r:
-                r.raise_for_status()
-                with open(asset_path, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
-
-            # Extract zip files if extract_zips is True
-            if extract_zips and asset_name.endswith('.zip'):
-                # noinspection PyTypeChecker
-                with zipfile.ZipFile(asset_path, 'r') as zip_ref:
-                    zip_ref.extractall(directory)
-                os.remove(os.path.join(directory, asset_name))
-
-        log_operation(summary, "Download content from tag", "SUCCESS")
-
-    else:
-        response.raise_for_status()
-
-
-def retrieve_sw_version_file(source_path, summary):
+def retrieve_sw_version_file(source_path):
     """Retrieve the SW version file from the specified directory."""
     if os.path.exists(source_path):
         files = os.listdir(source_path)
         for file in files:
-            match_1 = pattern_1.match(file)
-            match_2 = pattern_2.match(file)
+            match_1 = sw_filename_pattern_1.match(file)
+            match_2 = sw_filename_pattern_2.match(file)
             if match_1 or match_2:
                 # Copy the file to the closed-source directory
                 shutil.copy2(os.path.join(source_path, file), os.path.join(closed_source_directory, file))
-                log_operation(summary, f"Retrieve {file}", "SUCCESS")
+                log_operation(f"Retrieve {file}", "SUCCESS")
                 return
 
 
-def log_operation(summary, operation, result, critical=False, print_realtime=False):
+def log_operation(operation, result, critical=False, print_realtime=False):
     """Log the result of an operation."""
     critical_message = "CRITICAL: " if critical else ""
     message = f"{critical_message}{operation}: {result}"
@@ -231,7 +300,7 @@ def log_operation(summary, operation, result, critical=False, print_realtime=Fal
         print(message)
 
 
-def print_summary(summary):
+def print_summary():
     """Print a summary of all operations."""
     if summary:
         print("\nSummary of Operations:")
@@ -245,13 +314,25 @@ def print_summary(summary):
 
 
 def update():
-    summary = []
     backed_up_files = []
     fetch_new_start_easycut_script = False
 
+    # Create GitHub object
+    gh = GitHub(closed_source_repo_owner, closed_source_repo_name)
+
+    # Check for USB storage
+    usb = USB_Storage()
+    if usb.is_available():
+        log_operation("USB Storage", "FOUND")
+        usb_sw_version = usb.get_sw_version()
+        if usb_sw_version:
+            # Download and install new version
+            usb.download_content(directory=closed_source_directory)
+            return
+
     # Determine installed sw version from [sw_version].txt
-    installed_sw_version = find_local_sw_version(summary)
-    if installed_sw_version == "v0.0.0":
+    installed_sw_version = find_local_sw_version()
+    if installed_sw_version == default_sw_version:
         fetch_new_start_easycut_script = True
 
     # Check for start_easycut.sh script
@@ -259,7 +340,7 @@ def update():
         fetch_new_start_easycut_script = True
 
     # Fetch latest tag from GitHub
-    available_sw_version = get_latest_tag(closed_source_repo_owner, closed_source_repo_name, summary)
+    available_sw_version = gh.get_latest_tag()
 
     # Compare installed and available SW versions
     a, b, c = map(int, installed_sw_version[1:].split("."))
@@ -268,54 +349,53 @@ def update():
     ahead_of_remote = (a > d) or (a == d and b > e) or (a == d and b == e and c > f)
     if ahead_of_remote:
         print("SW is ahead of remote. How have you managed that?? - Exiting")
-        return summary
+        return
 
     if not new_version_available and not fetch_new_start_easycut_script:
         print("SW is up to date - Exiting")
-        return summary
+        return
 
     # Check if old open-source easycut directory exists
     if os.path.exists("easycut-smartbench"):
-        log_operation(summary, "Open-Source Easycut Directory", "FOUND")
+        log_operation("Open-Source Easycut Directory", "FOUND")
 
         # Perform backups
         for directory in dirs_to_backup:
-            backup_directory(os.path.join("easycut-smartbench", "src", directory), summary)
+            backup_directory(os.path.join("easycut-smartbench", "src", directory))
 
         # Remove open-source easycut directory
-        remove_directory("easycut-smartbench", summary)
+        remove_directory("easycut-smartbench")
 
         # Replace the start_easycut.sh script
         fetch_new_start_easycut_script = True
 
     # Check if new compiled easycut directory exists
     if os.path.exists(closed_source_directory):
-        log_operation(summary, "Compiled Easycut", "FOUND")
+        log_operation("Compiled Easycut", "FOUND")
 
         # Backup and delete current version
-        backup_file(closed_source_executable, summary)
-        remove_file(closed_source_executable, summary)
+        backup_file(closed_source_executable)
+        remove_file(closed_source_executable)
     else:
         # Create new compiled easycut directory
         os.makedirs(closed_source_directory)
-        log_operation(summary, "Compiled Easycut directory", "NOT FOUND, CREATED")
+        log_operation("Compiled Easycut directory", "NOT FOUND, CREATED")
 
     # New version available, perform update
-    log_operation(summary, "Newer Version Available", "YES")
+    log_operation("Newer Version Available", "YES")
 
     # Download and install new version
-    download_assets_from_tag(open_source_repo_owner, open_source_repo_name, available_sw_version,
-                             closed_source_directory, summary)
+    gh.download_content(tag_name=available_sw_version, directory=closed_source_directory)
 
     # Replace the start_easycut.sh script if necessary
     if fetch_new_start_easycut_script:
-        replace_file(os.path.join(closed_source_directory, "assets", "start_easycut.sh"), "start_easycut.sh", summary)
+        replace_file(os.path.join(closed_source_directory, "assets", "start_easycut.sh"), "start_easycut.sh")
 
     # Fetch new SW version file
-    retrieve_sw_version_file(os.path.join(closed_source_directory, "assets"), summary)
+    retrieve_sw_version_file(os.path.join(closed_source_directory, "assets"))
 
     # Delete old version file
-    remove_file(f"{installed_sw_version.replace('.', '')}.txt", summary)
+    remove_file(f"{installed_sw_version.replace('.', '')}.txt")
 
     # Position any backed-up files from open-source easycut
     if os.path.exists(backup_dir):
@@ -324,15 +404,15 @@ def update():
                 shutil.move(os.path.join(backup_dir, file), os.path.join(closed_source_directory, file))
                 backed_up_files.append(file)
     if backed_up_files:
-        log_operation(summary, "Backed-Up & Positioned Files", ", ".join(backed_up_files))
+        log_operation("Backed-Up & Positioned Files", ", ".join(backed_up_files))
 
     # Delete backup directory
-    remove_directory(backup_dir, summary)
+    remove_directory(backup_dir)
 
-    return summary
+    return
 
 
 if __name__ == "__main__":
-    progress = update()
-    print_summary(progress)
+    update()
+    print_summary()
     input("Press Enter to exit...")
